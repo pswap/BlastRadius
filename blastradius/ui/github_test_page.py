@@ -17,7 +17,7 @@ def render_pr(pr):
     additions, deletions = sum(f.additions for f in pr.changed_files), sum(f.deletions for f in pr.changed_files)
     c1, c2, c3 = st.columns(3); c1.metric("Changed files", len(pr.changed_files)); c2.metric("Additions", additions); c3.metric("Deletions", deletions)
     st.subheader("Changed files")
-    st.dataframe([{"Path": f.path, "Status": f.status, "+": f.additions, "-": f.deletions} for f in pr.changed_files], use_container_width=True)
+    st.dataframe([{"Path": f.path, "Status": f.status, "+": f.additions, "-": f.deletions} for f in pr.changed_files], hide_index=True)
     with st.expander("Diff"): st.code(pr.diff or "No diff supplied by GitHub.", language="diff")
 
 

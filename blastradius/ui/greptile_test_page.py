@@ -26,7 +26,7 @@ def render_components(components):
             }
             for component in components
         ],
-        use_container_width=True,
+        hide_index=True,
     )
     with st.expander("Evidence"):
         st.json([evidence.model_dump() for component in components for evidence in component.evidence])
