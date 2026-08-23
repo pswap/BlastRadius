@@ -43,6 +43,10 @@ Greptile's current public docs expose an authenticated MCP endpoint at `https://
 
 Engineering memory is SQLite with keyword retrieval (suitable for this MVP). It contains historical PRs #101, #102, #120 and #121. Every report claim uses explicit `source`, `reference`, and `claim` evidence; absent information is reported as insufficient evidence.
 
+### Engineering Memory (Phase 4)
+
+`MemoryStore` initializes a small SQLite schema and supports `add_memory`, `get_memory`, `search_memory`, and `list_memories` for incidents, PRs, postmortems, architecture decisions, and engineering notes. Search is deterministic keyword ranking by default. An application may inject an `EmbeddingProvider`; embeddings are persisted in SQLite and used for cosine-similarity search, with automatic keyword fallback if the provider is unavailable. `seed_demo()` adds PRs #101, #102, #120, and #121.
+
 ## MCP mapping
 
 The adapter methods map directly to future MCP tools: `github_get_pr`, `github_get_history`, `greptile_query`, `greptile_find_dependencies`, `memory_search`, and `memory_get`. This keeps an MCP server optional and out of the critical demo path.
