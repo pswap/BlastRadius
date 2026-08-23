@@ -52,7 +52,8 @@ class BlastRadiusAgent:
     def _analyze_codebase(self, state: AgentState):
         update = self._step(state, "Queried codebase")
         components = self.impact.analyze(self.greptile, state["pr"].changed_files)
-        tests = self.greptile.find_related_tests("PaymentService")
+        target = ", ".join(file.path for file in state["pr"].changed_files) or state["pr"].title
+        tests = self.greptile.find_related_tests(target)
         mapped = self._step({**state, "progress": update["progress"]}, "Mapped dependencies")
         return {**mapped, "components": components, "tests": tests}
 
@@ -69,8 +70,14 @@ class BlastRadiusAgent:
         update = self._step(state, "Identified failure scenarios")
         component_evidence = [e for component in state["components"] for e in component.evidence]
         historical_evidence = [e for item in state["history"][:1] for e in item.evidence]
+        files = ", ".join(file.path for file in state["pr"].changed_files) or "Insufficient evidence"
+        dependencies = ", ".join(component.name for component in state["components"]) or "Insufficient evidence"
         if component_evidence and historical_evidence:
-            scenario = {"trigger": "Retry limit changes from 3 to 5", "behavior": "Additional payment attempts", "dependency": "PaymentService publishes PaymentEvent to payment.events", "failure": "Duplicate processing by downstream consumer", "impact": "Potential duplicate transaction", "evidence": [e.model_dump() for e in component_evidence + historical_evidence]}
+            historical = state["history"][0]
+            scenario = {"classification": "INFERENCE", "trigger": f"Changes to {files}", "behavior": state["pr"].title, "dependency": f"Identified affected components: {dependencies}", "failure": f"A similar historical change had outcome: {historical.outcome}", "impact": historical.outcome, "evidence": [e.model_dump() for e in component_evidence + historical_evidence]}
+            return {**update, "failure_scenarios": [scenario]}
+        if component_evidence:
+            scenario = {"classification": "UNKNOWN", "trigger": f"Changes to {files}", "behavior": state["pr"].title, "dependency": f"Identified affected components: {dependencies}", "failure": "Insufficient evidence to identify a concrete failure mode.", "impact": "Insufficient evidence to quantify downstream impact.", "evidence": [e.model_dump() for e in component_evidence]}
             return {**update, "failure_scenarios": [scenario]}
         return {**update, "failure_scenarios": []}
 
@@ -90,19 +97,25 @@ class BlastRadiusAgent:
         else:
             claims.append(AnalysisClaim(classification="UNKNOWN", claim="Insufficient evidence of a similar historical change.", evidence=[Evidence(source="memory", reference="search_memory", claim="No matching record was retrieved")]))
         if evidence:
-            claims.append(AnalysisClaim(classification="INFERENCE", claim="The changed behavior can reach identified downstream components through the documented event path.", evidence=evidence))
-        return {**update, "reasoning_chain": ["Current change", "Behavior change", "Downstream dependency", "Failure scenario", "Potential impact"], "claims": claims}
+            claims.append(AnalysisClaim(classification="INFERENCE", claim="The changed code may affect the identified components through the documented relationships.", evidence=evidence))
+        chain = [f"Changed files: {', '.join(file.path for file in state['pr'].changed_files) or 'Insufficient evidence'}", f"Affected components: {', '.join(component.name for component in state['components']) or 'Insufficient evidence'}", "Historical comparison: " + (state["history"][0].source_id if state["history"] else "Insufficient evidence"), "Risk: deterministic score from evidence-backed factors"]
+        return {**update, "reasoning_chain": chain, "claims": claims}
 
     def _recommend(self, state: AgentState):
         update = self._step(state, "Generated recommendations")
+        github_evidence = [Evidence(source="github", reference=f"PR #{state['pr'].number}", claim=f"Changed files: {', '.join(file.path for file in state['pr'].changed_files)}")]
         historical = state["history"][0].evidence if state["history"] else []
         component_evidence = [e for component in state["components"] for e in component.evidence]
-        actions = [
-            RecommendedAction(priority="P0", action="Add an idempotency regression test", reason="A similar retry change has historical duplicate-processing evidence.", related_risk="historical", evidence=historical),
-            RecommendedAction(priority="P1", action="Run Kafka consumer contract tests", reason="Identified consumers depend on payment.events.", related_risk="event", evidence=component_evidence),
-            RecommendedAction(priority="P1", action="Verify FraudService compatibility", reason="FraudService is an identified downstream consumer.", related_risk="dependency", evidence=component_evidence),
-        ]
-        tests = ["Idempotency: same payment key across five retries produces one charge", "Kafka contract: PaymentEvent remains consumable by FraudService", "Consumer deduplication: repeated PaymentEvent is safely ignored"]
+        actions = [RecommendedAction(priority="P0", action="Add a regression test for the changed behavior", reason="The PR changes executable code and needs direct regression coverage.", related_risk="testing", evidence=github_evidence)]
+        tests = [f"Regression test for changes in {file.path}" for file in state["pr"].changed_files] or ["Add a regression test for the PR behavior"]
+        if component_evidence:
+            actions.append(RecommendedAction(priority="P1", action="Run targeted contract or integration tests for affected components", reason="Codebase analysis identified components related to the change.", related_risk="dependency", evidence=component_evidence))
+            tests.append("Integration test covering: " + ", ".join(component.name for component in state["components"]))
+        if historical:
+            actions.append(RecommendedAction(priority="P1", action="Add a regression test for the relevant historical outcome", reason="A similar historical change has recorded failure evidence.", related_risk="historical", evidence=historical))
+            tests.append("Historical regression: " + state["history"][0].outcome)
+        else:
+            actions.append(RecommendedAction(priority="P2", action="Review downstream impact before merge", reason="No matching historical outcome was retrieved.", related_risk="unknown", evidence=github_evidence + component_evidence))
         return {**update, "actions": actions, "recommended_tests": tests}
 
     def _generate_report(self, state: AgentState):
