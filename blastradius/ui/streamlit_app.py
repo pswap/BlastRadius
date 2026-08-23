@@ -13,6 +13,13 @@ from blastradius.memory import MemoryStore, seed_demo
 from blastradius.agent import BlastRadiusAgent
 from blastradius.config import settings
 from blastradius.demo import demo_pr, demo_agent
+
+
+def load_demo_url():
+    st.session_state.url = demo_pr().url
+    st.session_state.pop("report", None)
+
+
 def render(report):
     st.markdown(f"## 🔥 {report.risk_level.value} &nbsp; {report.risk_score} / 100")
     st.info(report.summary)
@@ -41,11 +48,11 @@ def main():
     st.set_page_config(page_title="BlastRadius", page_icon="🔥", layout="wide")
     st.title("🔥 BlastRadius")
     st.caption("Git shows what changed. BlastRadius shows what could break.")
-    if "url" not in st.session_state: st.session_state.url = demo_pr().url
+    st.session_state.setdefault("url", demo_pr().url)
     url = st.text_input("GitHub PR URL", key="url")
     col1, col2 = st.columns([1, 4])
     with col1:
-        if st.button("Load Demo PR"): st.session_state.url = demo_pr().url; st.rerun()
+        st.button("Load Demo PR", on_click=load_demo_url)
     with col2:
         run = st.button("Analyze Blast Radius", type="primary")
     if run:
