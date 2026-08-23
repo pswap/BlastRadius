@@ -1,11 +1,7 @@
-"""Greptile adapter using the currently documented MCP HTTP transport.
-
-The public Greptile docs currently document MCP transport, ping, tools/list,
-and tools/call. They do not document direct codebase query/dependency/caller
-operations, so this adapter never guesses a tool name or response schema.
-"""
+"""Greptile adapter using the currently documented MCP HTTP transport."""
 from __future__ import annotations
 
+import json
 from typing import Any, Protocol
 
 import requests
@@ -38,12 +34,19 @@ class GreptileClient(Protocol):
 
 
 class RealGreptileClient:
-    """Verified adapter for Greptile's documented JSON-RPC MCP endpoint."""
+    """Maps BlastRadius operations onto Greptile's documented MCP KB tools."""
     endpoint = "https://api.greptile.com/mcp"
 
-    def __init__(self, api_key: str, session: requests.Session | Any | None = None):
+    def __init__(
+        self,
+        api_key: str,
+        session: requests.Session | Any | None = None,
+        repository: str = "",
+    ):
         self.api_key = api_key.strip()
         self.session = session or requests.Session()
+        self.repository = repository.strip()
+        self._repo_namespace_id: str | None = None
 
     @property
     def headers(self) -> dict[str, str]:
@@ -67,17 +70,49 @@ class RealGreptileClient:
             raise GreptileError("Greptile request timed out. Please try again.") from exc
         except requests.RequestException as exc:
             status = getattr(exc.response, "status_code", None)
-            if status in (401, 403): message = "Greptile authentication or authorization failed. Check GREPTILE_API_KEY access."
-            else: message = "Greptile API request failed. Please try again."
+            if status in (401, 403):
+                message = "Greptile authentication or authorization failed. Check GREPTILE_API_KEY access."
+            else:
+                message = "Greptile API request failed. Please try again."
             raise GreptileError(message) from exc
         except ValueError as exc:
             raise GreptileError("Greptile returned an unexpected response.") from exc
+        if not isinstance(body, dict):
+            raise GreptileError("Greptile returned an unexpected response.")
         if error := body.get("error"):
+            code = error.get("code")
             message = str(error.get("message", "Greptile MCP request failed."))
-            if "auth" in message.lower():
+            lower = message.lower()
+            if code == 429 or "rate limit" in lower or "too many requests" in lower:
+                raise GreptileRateLimitError("Greptile rate limit reached. Please retry later.")
+            if "auth" in lower or "unauthorized" in lower or "forbidden" in lower:
                 message = "Greptile authentication or authorization failed. Check GREPTILE_API_KEY access."
             raise GreptileError(message)
         return body.get("result")
+
+    def _call_tool(self, name: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
+        result = self._call("tools/call", {"name": name, "arguments": arguments or {}})
+        if isinstance(result, dict) and "content" in result:
+            return self._unwrap_mcp_content(result)
+        if isinstance(result, dict):
+            return result
+        raise GreptileError("Greptile returned an unexpected tool response.")
+
+    @staticmethod
+    def _unwrap_mcp_content(result: dict[str, Any]) -> dict[str, Any]:
+        """Accepts standard MCP text content when Greptile returns that wrapper."""
+        content = result.get("content")
+        if not isinstance(content, list):
+            raise GreptileError("Greptile returned an unexpected tool response.")
+        for item in content:
+            if isinstance(item, dict) and item.get("type") == "text":
+                try:
+                    parsed = json.loads(item.get("text", ""))
+                except ValueError as exc:
+                    raise GreptileError("Greptile returned an unexpected tool response.") from exc
+                if isinstance(parsed, dict):
+                    return parsed
+        raise GreptileError("Greptile returned an unexpected tool response.")
 
     def verify_connection(self) -> bool:
         """Uses the documented JSON-RPC ping request."""
@@ -92,18 +127,154 @@ class RealGreptileClient:
             raise GreptileError("Greptile returned an unexpected tools/list response.")
         return tools
 
+    def _repository_namespace_id(self) -> str:
+        if self._repo_namespace_id:
+            return self._repo_namespace_id
+        result = self._call_tool("list_knowledge_bases", {"limit": 100})
+        repositories = result.get("repositories", [])
+        if not isinstance(repositories, list):
+            raise GreptileError("Greptile returned an unexpected knowledge-base response.")
+        if self.repository:
+            selected = next(
+                (repo for repo in repositories if repo.get("repoName", "").lower() == self.repository.lower()),
+                None,
+            )
+            if not selected:
+                raise GreptileCapabilityError(
+                    f"Greptile knowledge base was not found for {self.repository}. "
+                    "Confirm the repository is indexed and enabled for Knowledge Base access."
+                )
+        elif len(repositories) == 1:
+            selected = repositories[0]
+        else:
+            raise GreptileConfigurationError(
+                "GREPTILE_REPOSITORY or GITHUB_OWNER/GITHUB_REPO is required when multiple Greptile knowledge bases are visible."
+            )
+        repo_id = selected.get("repoNamespaceExternalId")
+        if not isinstance(repo_id, str) or not repo_id:
+            raise GreptileError("Greptile returned an unexpected knowledge-base response.")
+        self._repo_namespace_id = repo_id
+        return repo_id
+
     @staticmethod
-    def _unsupported(operation: str) -> None:
-        raise GreptileCapabilityError(
-            f"Greptile's current public MCP documentation does not define a supported mapping for {operation}. "
-            "No request was sent; use MockGreptileClient in demo mode."
+    def _query(text: str) -> str:
+        cleaned = " ".join(text.strip().split())
+        if len(cleaned) < 2:
+            raise ValueError("Greptile query must contain at least two characters.")
+        return cleaned[:200]
+
+    def _search_knowledge_base(self, query: str, limit: int = 10) -> dict[str, Any]:
+        return self._call_tool(
+            "search_knowledge_base",
+            {
+                "repoNamespaceExternalId": self._repository_namespace_id(),
+                "query": self._query(query),
+                "sections": ["docs", "reverts"],
+                "limit": limit,
+            },
         )
 
-    def query_codebase(self, question: str) -> list[AffectedComponent]: self._unsupported("query_codebase")
-    def find_dependencies(self, target: str) -> list[AffectedComponent]: self._unsupported("find_dependencies")
-    def find_callers(self, target: str) -> list[AffectedComponent]: self._unsupported("find_callers")
-    def find_related_tests(self, target: str) -> list[AffectedComponent]: self._unsupported("find_related_tests")
-    def explain_architecture(self, target: str) -> str: self._unsupported("explain_architecture")
+    def _knowledge_components(
+        self,
+        *,
+        query: str,
+        relationship: str,
+        component_type: str = "knowledge base",
+    ) -> list[AffectedComponent]:
+        result = self._search_knowledge_base(query)
+        matches = result.get("results", [])
+        if not isinstance(matches, list):
+            raise GreptileError("Greptile returned an unexpected knowledge-base search response.")
+        components: list[AffectedComponent] = []
+        for item in matches:
+            if not isinstance(item, dict):
+                continue
+            path = str(item.get("path") or "knowledge-base")
+            evidence = self._evidence_from_matches(path, query, item.get("matches", []))
+            if evidence:
+                components.append(
+                    AffectedComponent(
+                        name=path,
+                        type=component_type,
+                        relationship=relationship,
+                        confidence=0.70,
+                        evidence=evidence,
+                    )
+                )
+        return components
+
+    @staticmethod
+    def _evidence_from_matches(path: str, query: str, matches: Any) -> list[Evidence]:
+        if not isinstance(matches, list):
+            return []
+        evidence: list[Evidence] = []
+        for match in matches:
+            if not isinstance(match, dict):
+                continue
+            line = match.get("lineNumber")
+            reference = f"{path}:{line}" if line else path
+            snippet = str(match.get("snippet") or "").strip()
+            claim = f"Knowledge base match for '{query}': {snippet or 'matched document'}"
+            evidence.append(Evidence(source="greptile", reference=reference, claim=claim[:500]))
+        return evidence
+
+    def _list_knowledge_base_documents(self) -> dict[str, Any]:
+        return self._call_tool(
+            "list_knowledge_base_documents",
+            {"repoNamespaceExternalId": self._repository_namespace_id(), "limit": 100},
+        )
+
+    def _get_knowledge_base_document(self, path: str) -> str:
+        result = self._call_tool(
+            "get_knowledge_base_document",
+            {"repoNamespaceExternalId": self._repository_namespace_id(), "path": path},
+        )
+        document = result.get("document", {})
+        if not isinstance(document, dict):
+            raise GreptileError("Greptile returned an unexpected knowledge-base document response.")
+        content = document.get("content")
+        if not isinstance(content, str):
+            raise GreptileError("Greptile returned an unexpected knowledge-base document response.")
+        return content
+
+    def query_codebase(self, question: str) -> list[AffectedComponent]:
+        return self._knowledge_components(
+            query=question,
+            relationship="Greptile knowledge base result for codebase question",
+        )
+
+    def find_dependencies(self, target: str) -> list[AffectedComponent]:
+        return self._knowledge_components(
+            query=f"{target} dependencies imports consumers downstream",
+            relationship=f"Greptile knowledge base result for dependencies of {target}",
+        )
+
+    def find_callers(self, target: str) -> list[AffectedComponent]:
+        return self._knowledge_components(
+            query=f"{target} callers call sites usages references",
+            relationship=f"Greptile knowledge base result for callers of {target}",
+        )
+
+    def find_related_tests(self, target: str) -> list[AffectedComponent]:
+        return self._knowledge_components(
+            query=f"{target} tests test coverage specs",
+            relationship=f"Greptile knowledge base result for tests related to {target}",
+            component_type="test",
+        )
+
+    def explain_architecture(self, target: str) -> str:
+        documents = self._list_knowledge_base_documents()
+        paths = documents.get("documentPaths", [])
+        if isinstance(paths, list) and "index.md" in paths:
+            return self._get_knowledge_base_document("index.md")
+        results = self._search_knowledge_base(f"{target} architecture", limit=5).get("results", [])
+        snippets = [
+            str(match.get("snippet", "")).strip()
+            for item in results if isinstance(item, dict)
+            for match in item.get("matches", []) if isinstance(match, dict)
+            if str(match.get("snippet", "")).strip()
+        ]
+        return "\n\n".join(snippets) if snippets else "Insufficient evidence"
 
 
 class MockGreptileClient:
@@ -123,5 +294,5 @@ class MockGreptileClient:
     def explain_architecture(self, target: str) -> str: return "PaymentService publishes PaymentEvent to payment.events; FraudService and NotificationService consume it."
 
 
-def get_greptile_client(*, demo_mode: bool, api_key: str) -> GreptileClient:
-    return MockGreptileClient() if demo_mode else RealGreptileClient(api_key)
+def get_greptile_client(*, demo_mode: bool, api_key: str, repository: str = "") -> GreptileClient:
+    return MockGreptileClient() if demo_mode else RealGreptileClient(api_key, repository=repository)

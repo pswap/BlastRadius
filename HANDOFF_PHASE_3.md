@@ -53,3 +53,7 @@ Do not work on engineering memory, historical similarity, risk scoring, LLM reas
 - Run a headless Streamlit smoke test.
 - Report changed files, test result, and the Greptile test-page command.
 - Do not commit or push unless explicitly asked.
+
+## Current Mapping Note
+
+The current official Greptile docs expose the HTTP MCP endpoint and Knowledge Base tools. The Phase 3 implementation maps the BlastRadius logical operations onto `search_knowledge_base` and `get_knowledge_base_document`, with all calls made through `tools/call`. `DEMO_MODE=true` still uses `MockGreptileClient` and requires no credentials.

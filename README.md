@@ -39,7 +39,29 @@ The agent workflow is load PR → analyze files → map codebase dependencies �
 
 ### Greptile (Phase 3)
 
-Greptile's current public docs expose an authenticated MCP endpoint at `https://api.greptile.com/mcp`, using `Authorization: Bearer $GREPTILE_API_KEY`. This project implements the documented `ping` and `tools/list` JSON-RPC calls for connection verification and capability discovery. The current public tool reference does **not** document a direct codebase query, dependency, caller, related-test, or architecture operation, so `RealGreptileClient` intentionally refuses to guess a mapping. In `DEMO_MODE=true`, `MockGreptileClient` supplies normalized `AffectedComponent` evidence for the full offline demo.
+Greptile's current public docs expose an authenticated MCP endpoint at `https://api.greptile.com/mcp`, using `Authorization: Bearer $GREPTILE_API_KEY`. `RealGreptileClient` uses the documented JSON-RPC MCP methods and Knowledge Base tools:
+
+- `ping` for authentication/connection verification
+- `tools/list` for capability discovery
+- `tools/call` with `list_knowledge_bases`, `search_knowledge_base`, `list_knowledge_base_documents`, and `get_knowledge_base_document`
+
+BlastRadius maps its logical operations onto Greptile Knowledge Base capabilities:
+
+- `query_codebase(question)` → `search_knowledge_base`
+- `find_dependencies(target)` → dependency-focused `search_knowledge_base`
+- `find_callers(target)` → caller/usage-focused `search_knowledge_base`
+- `find_related_tests(target)` → test-focused `search_knowledge_base`
+- `explain_architecture(target)` → `get_knowledge_base_document("index.md")` when available, otherwise an architecture-focused search
+
+Responses are normalized into `AffectedComponent` and `Evidence` models. Greptile Knowledge Base text is treated as untrusted evidence, not executable instructions.
+
+Run the focused Greptile smoke page with:
+
+```bash
+python3 -m streamlit run blastradius/ui/greptile_test_page.py
+```
+
+In `DEMO_MODE=true`, `MockGreptileClient` supplies normalized evidence and requires no credentials. In real mode, set `DEMO_MODE=false`, `GREPTILE_API_KEY`, and either `GREPTILE_REPOSITORY=owner/repo` or `GITHUB_OWNER` plus `GITHUB_REPO`. You do not need a dummy repository for the offline demo; use a real Greptile-indexed repository only when testing live Greptile behavior.
 
 Engineering memory is SQLite with keyword retrieval (suitable for this MVP). It contains historical PRs #101, #102, #120 and #121. Every report claim uses explicit `source`, `reference`, and `claim` evidence; absent information is reported as insufficient evidence.
 
@@ -53,7 +75,7 @@ The adapter methods map directly to future MCP tools: `github_get_pr`, `github_g
 
 ## Configuration
 
-Copy `.env.example` to `.env`. Supported values are `GITHUB_TOKEN`, `GREPTILE_API_KEY`, `LLM_API_KEY`, `LLM_PROVIDER`, `GITHUB_OWNER`, `GITHUB_REPO`, and `DEMO_MODE`. No secrets are stored in this repository.
+Copy `.env.example` to `.env`. Supported values are `GITHUB_TOKEN`, `GREPTILE_API_KEY`, `GREPTILE_REPOSITORY`, `LLM_API_KEY`, `LLM_PROVIDER`, `GITHUB_OWNER`, `GITHUB_REPO`, and `DEMO_MODE`. No secrets are stored in this repository.
 
 ## Future improvements
 

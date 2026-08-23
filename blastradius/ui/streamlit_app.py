@@ -1,6 +1,6 @@
 import json
 import streamlit as st
-from blastradius.tools import MockGitHubClient, MockGreptileClient, RealGitHubClient
+from blastradius.tools import MockGitHubClient, RealGitHubClient, get_greptile_client
 from blastradius.tools.github import parse_pr_url
 from blastradius.memory import MemoryStore, seed_demo
 from blastradius.agent import BlastRadiusAgent
@@ -50,8 +50,10 @@ def main():
             if settings.demo_mode: agent = demo_agent(); owner, repo, number = "acme", "payments", 123
             else:
                 if not settings.github_token: raise RuntimeError("GITHUB_TOKEN is required when DEMO_MODE=false.")
+                if not settings.greptile_api_key: raise RuntimeError("GREPTILE_API_KEY is required when DEMO_MODE=false.")
                 store = MemoryStore("blastradius.db"); seed_demo(store)
-                agent = BlastRadiusAgent(RealGitHubClient(settings.github_token), MockGreptileClient(), store)
+                greptile_repository = settings.greptile_repository or f"{owner}/{repo}"
+                agent = BlastRadiusAgent(RealGitHubClient(settings.github_token), get_greptile_client(demo_mode=False, api_key=settings.greptile_api_key, repository=greptile_repository), store)
             report = agent.analyze(owner, repo, number, update)
             st.session_state.report = report
         except Exception as exc: st.error(f"Analysis could not run: {exc}")
