@@ -23,6 +23,7 @@ def test_agent_marks_missing_history_as_unknown_and_logs_steps(caplog):
 
 
 class GenericGreptile:
+    def set_pull_request_context(self, owner, repo, number, default_branch="main"): pass
     def query_codebase(self, question):
         return [AffectedComponent(name="OrderService", type="service", relationship="consumes order changes", confidence=.9, evidence=[Evidence(source="greptile", reference="orders/consumer.py", claim="OrderService consumes OrderChanged events")])]
     def find_related_tests(self, target): return []

@@ -51,6 +51,7 @@ class BlastRadiusAgent:
 
     def _analyze_codebase(self, state: AgentState):
         update = self._step(state, "Queried codebase")
+        self.greptile.set_pull_request_context(state["pr"].owner, state["pr"].repo, state["pr"].number)
         components = self.impact.analyze(self.greptile, state["pr"].changed_files)
         target = ", ".join(file.path for file in state["pr"].changed_files) or state["pr"].title
         tests = self.greptile.find_related_tests(target)

@@ -39,21 +39,21 @@ The agent workflow is load PR → analyze files → map codebase dependencies �
 
 ### Greptile (Phase 3)
 
-Greptile's current public docs expose an authenticated MCP endpoint at `https://api.greptile.com/mcp`, using `Authorization: Bearer $GREPTILE_API_KEY`. `RealGreptileClient` uses the documented JSON-RPC MCP methods and Knowledge Base tools:
+Greptile's current public docs expose an authenticated MCP endpoint at `https://api.greptile.com/mcp`, using `Authorization: Bearer $GREPTILE_API_KEY`. `RealGreptileClient` uses documented JSON-RPC PR-review tools only:
 
 - `ping` for authentication/connection verification
 - `tools/list` for capability discovery
-- `tools/call` with `list_knowledge_bases`, `search_knowledge_base`, `list_knowledge_base_documents`, and `get_knowledge_base_document`
+- `tools/call` with `get_merge_request` and `list_merge_request_comments`
 
-BlastRadius maps its logical operations onto Greptile Knowledge Base capabilities:
+BlastRadius maps its logical operations onto the active PR's review summary and review comments:
 
-- `query_codebase(question)` → `search_knowledge_base`
-- `find_dependencies(target)` → dependency-focused `search_knowledge_base`
-- `find_callers(target)` → caller/usage-focused `search_knowledge_base`
-- `find_related_tests(target)` → test-focused `search_knowledge_base`
-- `explain_architecture(target)` → `get_knowledge_base_document("index.md")` when available, otherwise an architecture-focused search
+- `query_codebase(question)` → `get_merge_request` review summary
+- `find_dependencies(target)` → matching unaddressed review comments
+- `find_callers(target)` → matching unaddressed review comments
+- `find_related_tests(target)` → matching unaddressed review comments
+- `explain_architecture(target)` → insufficient evidence (not available from review data)
 
-Responses are normalized into `AffectedComponent` and `Evidence` models. Greptile Knowledge Base text is treated as untrusted evidence, not executable instructions.
+Responses are normalized into `AffectedComponent` and `Evidence` models. Review data is treated as untrusted evidence, not executable instructions.
 
 Run the focused Greptile smoke page with:
 
