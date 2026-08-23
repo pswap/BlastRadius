@@ -18,6 +18,7 @@ from blastradius.demo import demo_pr, demo_agent
 def load_demo_url():
     st.session_state.url = demo_pr().url
     st.session_state.pop("report", None)
+    st.session_state.demo_loaded = True
 
 
 def render(report):
@@ -49,12 +50,17 @@ def main():
     st.title("🔥 BlastRadius")
     st.caption("Git shows what changed. BlastRadius shows what could break.")
     st.session_state.setdefault("url", demo_pr().url)
+    st.session_state.setdefault("demo_loaded", False)
+    if settings.demo_mode:
+        st.info("Demo mode is on. No credentials are required; the app uses seeded GitHub, Greptile, and memory data.")
     url = st.text_input("GitHub PR URL", key="url")
     col1, col2 = st.columns([1, 4])
     with col1:
         st.button("Load Demo PR", on_click=load_demo_url)
     with col2:
         run = st.button("Analyze Blast Radius", type="primary")
+    if st.session_state.demo_loaded and not st.session_state.get("report"):
+        st.success("Demo PR loaded. Click Analyze Blast Radius to generate the report.")
     if run:
         steps = st.empty()
         progress = []

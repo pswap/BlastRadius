@@ -14,3 +14,4 @@ def test_load_demo_pr_button_updates_url_without_session_state_error():
 
     assert not app.exception
     assert app.session_state["url"] == "https://github.com/acme/payments/pull/123"
+    assert "Demo PR loaded" in app.success[0].value
