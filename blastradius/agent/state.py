@@ -1,19 +1,37 @@
-from typing import TypedDict
+from typing import Callable, TypedDict
+
+from blastradius.models import (
+    AffectedComponent, AnalysisClaim, BlastRadiusReport, HistoricalEvidence,
+    MemoryRecord, PullRequest, RecommendedAction, RiskFactor, RiskLevel,
+)
+
+
+class FailureScenario(TypedDict):
+    trigger: str
+    behavior: str
+    dependency: str
+    failure: str
+    impact: str
+    evidence: list[dict]
 
 
 class AgentState(TypedDict, total=False):
     owner: str
     repo: str
     number: int
-    callback: object
+    callback: Callable[[str], None]
     progress: list[str]
-    pr: object
-    components: list
-    tests: list
-    history: list
-    records: list
-    tests: list
+    pr: PullRequest
+    components: list[AffectedComponent]
+    tests: list[AffectedComponent]
+    records: list[MemoryRecord]
+    history: list[HistoricalEvidence]
+    failure_scenarios: list[FailureScenario]
+    reasoning_chain: list[str]
+    recommended_tests: list[str]
+    actions: list[RecommendedAction]
+    claims: list[AnalysisClaim]
     score: int
-    level: object
-    factors: list
-    report: object
+    level: RiskLevel
+    factors: list[RiskFactor]
+    report: BlastRadiusReport

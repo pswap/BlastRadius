@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 from pydantic import BaseModel, Field
 from .pr import PullRequest
 from .risk import RiskLevel
@@ -8,6 +8,13 @@ class Evidence(BaseModel):
     source: str
     reference: str
     claim: str
+
+
+class AnalysisClaim(BaseModel):
+    """A report assertion classified by its epistemic basis."""
+    classification: Literal["FACT", "INFERENCE", "UNKNOWN"]
+    claim: str
+    evidence: list[Evidence] = Field(default_factory=list)
 
 
 class AffectedComponent(BaseModel):
@@ -43,6 +50,7 @@ class RecommendedAction(BaseModel):
     action: str
     reason: str
     related_risk: str
+    evidence: list[Evidence] = Field(default_factory=list)
 
 
 class BlastRadiusReport(BaseModel):
@@ -58,3 +66,4 @@ class BlastRadiusReport(BaseModel):
     recommended_tests: list[str] = Field(default_factory=list)
     recommended_actions: list[RecommendedAction] = Field(default_factory=list)
     evidence: list[Evidence] = Field(default_factory=list)
+    claims: list[AnalysisClaim] = Field(default_factory=list)
