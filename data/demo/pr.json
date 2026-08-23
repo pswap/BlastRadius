@@ -1,0 +1,8 @@
+{
+  "owner": "acme", "repo": "payments", "number": 123,
+  "title": "Increase payment retry limit from 3 to 5",
+  "body": "Increase retry resilience for transient payment provider failures.",
+  "author": "demo-engineer", "url": "https://github.com/acme/payments/pull/123",
+  "commits": ["demo123"], "labels": ["payments", "reliability"],
+  "changed_files": [{"path": "payments/retry.py", "status": "modified", "additions": 2, "deletions": 2, "patch": "-MAX_RETRIES = 3\n+MAX_RETRIES = 5\n publish_payment_event(payment)"}]
+}

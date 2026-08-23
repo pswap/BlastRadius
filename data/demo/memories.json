@@ -1,0 +1,3 @@
+[
+  {"id":"PR-101","type":"pull_request","title":"PR #101: Increase payment retry attempts","description":"Changed PaymentService retry behavior. Extra retries emitted additional PaymentEvent records to payment.events.","date":"2025-02-10","source":"GitHub PR #101","tags":["payment","retry","kafka","idempotency"],"affected_components":["PaymentService","payment.events","FraudService"],"outcome":"Duplicate payment processing occurred because additional retries generated duplicate events."}
+]
