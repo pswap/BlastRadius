@@ -16,6 +16,14 @@ The default `DEMO_MODE=true` requires no credentials. Click **Load Demo PR**, th
 
 Run the test suite with `pytest -q`.
 
+## GitHub PR inspector (Phase 2)
+
+```bash
+python3 -m streamlit run blastradius/ui/github_test_page.py
+```
+
+In `DEMO_MODE=true`, this uses the mock client. Set `DEMO_MODE=false` and provide `GITHUB_TOKEN` to inspect a real accessible PR. The page shows title, author, changed files, additions/deletions, and diff. GitHub errors are converted into safe messages; tokens are never logged or displayed.
+
 ## Architecture
 
 ```text
