@@ -37,6 +37,10 @@ The agent workflow is load PR → analyze files → map codebase dependencies �
 
 `GitHubClient` and `GreptileClient` are clean adapter protocols, with mock implementations used by demo/tests. The GitHub adapter uses documented REST endpoints. The Greptile live adapter is intentionally a guarded boundary: configure it only after verifying the current official API documentation, rather than hard-coding unstable endpoints. The rest of the app remains unchanged.
 
+### Greptile (Phase 3)
+
+Greptile's current public docs expose an authenticated MCP endpoint at `https://api.greptile.com/mcp`, using `Authorization: Bearer $GREPTILE_API_KEY`. This project implements the documented `ping` and `tools/list` JSON-RPC calls for connection verification and capability discovery. The current public tool reference does **not** document a direct codebase query, dependency, caller, related-test, or architecture operation, so `RealGreptileClient` intentionally refuses to guess a mapping. In `DEMO_MODE=true`, `MockGreptileClient` supplies normalized `AffectedComponent` evidence for the full offline demo.
+
 Engineering memory is SQLite with keyword retrieval (suitable for this MVP). It contains historical PRs #101, #102, #120 and #121. Every report claim uses explicit `source`, `reference`, and `claim` evidence; absent information is reported as insufficient evidence.
 
 ## MCP mapping
