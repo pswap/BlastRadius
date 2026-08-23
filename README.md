@@ -16,7 +16,7 @@ The default `DEMO_MODE=true` requires no credentials. Click **Load Demo PR**, th
 
 Run the test suite with `pytest -q`.
 
-## GitHub PR inspector (Phase 2)
+## GitHub PR inspector (Phase -2)
 
 ```bash
 python3 -m streamlit run blastradius/ui/github_test_page.py
