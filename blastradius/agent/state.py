@@ -7,6 +7,7 @@ from blastradius.models import (
 
 
 class FailureScenario(TypedDict):
+    classification: str
     trigger: str
     behavior: str
     dependency: str
