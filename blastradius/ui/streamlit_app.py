@@ -19,6 +19,27 @@ from blastradius.tools.github import parse_pr_url
 
 DEMO_URL = demo_pr().url
 
+RISK_BADGE = {
+    "LOW": ("green", ":material/check_circle:"),
+    "MEDIUM": ("yellow", ":material/info:"),
+    "HIGH": ("orange", ":material/warning:"),
+    "CRITICAL": ("red", ":material/local_fire_department:"),
+}
+
+PRIORITY_BADGE = {
+    "P0": ("red", ":material/priority_high:"),
+    "P1": ("orange", ":material/flag:"),
+    "P2": ("blue", ":material/schedule:"),
+}
+
+SCENARIO_STAGES = [
+    ("trigger", "Trigger", ":material/bolt:"),
+    ("behavior", "Changed behavior", ":material/sync:"),
+    ("dependency", "Downstream dependency", ":material/account_tree:"),
+    ("failure", "Failure mode", ":material/error:"),
+    ("impact", "Potential impact", ":material/crisis_alert:"),
+]
+
 
 def load_demo_url():
     st.session_state.url = DEMO_URL
@@ -131,6 +152,12 @@ def render_kpis(report):
 def render_summary(report):
     with st.container(border=True):
         st.subheader("Executive summary", anchor=False)
+        color, icon = RISK_BADGE.get(report.risk_level.value, ("gray", ":material/info:"))
+        st.badge(
+            f"{report.risk_level.value} RISK · {report.risk_score}/100",
+            color=color,
+            icon=icon,
+        )
         st.write(report.summary)
         st.progress(report.risk_score, text=f"Risk score: {report.risk_score}/100")
 
@@ -207,6 +234,47 @@ def render_graphs(report):
                 st.caption("No confidence values were available.")
 
 
+def render_pr_context(report):
+    pr = report.pr
+    with st.container(border=True):
+        st.subheader("Pull request", anchor=False)
+        st.markdown(f"**{pr.title}**")
+        st.caption(
+            f":material/tag: #{pr.number} · :material/person: {pr.author} · "
+            f":material/database: {pr.owner}/{pr.repo}"
+        )
+        if pr.labels:
+            st.markdown(" ".join(f":gray-badge[{label}]" for label in pr.labels))
+        for changed in pr.changed_files:
+            st.markdown(
+                f"`{changed.path}` &nbsp; :green[+{changed.additions}] "
+                f":red[−{changed.deletions}] &nbsp; :gray[{changed.status}]"
+            )
+            if changed.patch:
+                st.code(changed.patch, language="diff")
+
+
+def render_failure_scenarios(report):
+    if not report.failure_scenarios:
+        return
+    with st.container(border=True):
+        st.subheader("How it could break", anchor=False)
+        for scenario in report.failure_scenarios:
+            for key, label, icon in SCENARIO_STAGES:
+                text = scenario.get(key)
+                if text:
+                    st.markdown(f"{icon} **{label}** — {text}")
+            evidence = scenario.get("evidence", [])
+            if evidence:
+                with st.expander(
+                    f"Evidence trail ({len(evidence)} sources)", icon=":material/link:"
+                ):
+                    for item in evidence:
+                        st.markdown(
+                            f":gray-badge[{item['source']}] `{item['reference']}` — {item['claim']}"
+                        )
+
+
 def render_recommendations(report):
     left, right = st.columns(2, gap="large")
     with left:
@@ -217,9 +285,13 @@ def render_recommendations(report):
     with right:
         with st.container(border=True):
             st.subheader("Recommended actions", anchor=False)
-            rows = action_rows(report)
-            if rows:
-                st.dataframe(rows, hide_index=True)
+            if report.recommended_actions:
+                for act in report.recommended_actions:
+                    color, icon = PRIORITY_BADGE.get(act.priority, ("gray", ":material/label:"))
+                    with st.container(border=True):
+                        st.badge(act.priority, color=color, icon=icon)
+                        st.markdown(f"**{act.action}**")
+                        st.caption(act.reason)
             else:
                 st.caption("No actions were generated.")
 
@@ -267,7 +339,9 @@ def render(report):
         ]
     )
     with overview:
+        render_pr_context(report)
         render_summary(report)
+        render_failure_scenarios(report)
         render_recommendations(report)
     with graphs:
         render_graphs(report)
@@ -299,8 +373,35 @@ def build_agent(owner: str, repo: str):
     return agent, owner, repo, None
 
 
+def inject_greptile_styles():
+    # Greptile-style section labels: monospace, uppercase, letter-spaced, muted.
+    # config.toml can't scope this to section headers alone, so a small style
+    # block handles it. Risk-severity colors stay our own identity.
+    st.html(
+        """
+        <style>
+          [data-testid="stHeading"] h3 {
+            font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace !important;
+            text-transform: uppercase;
+            letter-spacing: 0.09em;
+            font-size: 12.5px !important;
+            font-weight: 600 !important;
+            color: #8b857e !important;
+            margin-top: 0.35rem;
+          }
+          [data-testid="stMetricLabel"] {
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            font-size: 11.5px !important;
+          }
+        </style>
+        """
+    )
+
+
 def main():
     st.set_page_config(page_title="BlastRadius", page_icon="🔥", layout="wide")
+    inject_greptile_styles()
     st.title("BlastRadius", anchor=False)
     st.caption("Git shows what changed. BlastRadius shows what could break.")
 

@@ -1,0 +1,63 @@
+# BlastRadius theme — a serious security-tooling look with an ember "blast" accent.
+# Both light and dark modes are defined so users can toggle from the app menu.
+
+[theme]
+# Shared across modes: typography + shape
+font = "'Inter':https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+headingFont = "'Inter':https://fonts.googleapis.com/css2?family=Inter:wght@600;700;800&display=swap"
+codeFont = "'JetBrains Mono':https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap"
+baseFontSize = 15
+baseFontWeight = 400
+codeFontSize = "13px"
+headingFontSizes = ["30px", "22px", "18px", "16px", "14px", "13px"]
+headingFontWeights = [800, 700, 600, 600, 600, 600]
+baseRadius = "8px"
+buttonRadius = "8px"
+linkUnderline = false
+showWidgetBorder = true
+showSidebarBorder = true
+
+[theme.light]
+primaryColor = "#C2410C"             # burnt ember — white button text stays readable
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F5F5F4"
+codeBackgroundColor = "#F5F5F4"
+textColor = "#1C1917"
+linkColor = "#C2410C"
+borderColor = "#E7E5E4"
+codeTextColor = "#9A3412"
+dataframeBorderColor = "#E7E5E4"
+dataframeHeaderBackgroundColor = "#F5F5F4"
+# Risk-level ramp
+greenColor = "#16A34A"
+yellowColor = "#CA8A04"
+orangeColor = "#EA580C"
+redColor = "#DC2626"
+blueColor = "#2563EB"
+violetColor = "#7C3AED"
+grayColor = "#78716C"
+chartCategoricalColors = ["#EA580C", "#DC2626", "#CA8A04", "#16A34A", "#2563EB", "#7C3AED", "#78716C"]
+
+[theme.dark]
+primaryColor = "#F97316"             # bright ember for dark surfaces
+backgroundColor = "#0C0A09"          # near-black warm slate
+secondaryBackgroundColor = "#1C1917"
+codeBackgroundColor = "#161211"
+textColor = "#F5F5F4"
+linkColor = "#FB923C"
+borderColor = "#2C2622"
+codeTextColor = "#FDBA74"
+dataframeBorderColor = "#2C2622"
+dataframeHeaderBackgroundColor = "#1C1917"
+# Risk-level ramp (brighter for dark backgrounds)
+greenColor = "#4ADE80"
+yellowColor = "#FBBF24"
+orangeColor = "#FB923C"
+redColor = "#F87171"
+blueColor = "#60A5FA"
+violetColor = "#A78BFA"
+grayColor = "#A8A29E"
+chartCategoricalColors = ["#FB923C", "#F87171", "#FBBF24", "#4ADE80", "#60A5FA", "#A78BFA", "#A8A29E"]
+
+[theme.sidebar]
+showSidebarBorder = true
