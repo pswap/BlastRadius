@@ -1,82 +1,119 @@
-# 🔥 BlastRadius
+# BlastRadius
 
-> Git shows what changed. BlastRadius shows what could break.
+BlastRadius is a pull request impact and risk analyzer. It answers a simple engineering question:
 
-BlastRadius is an evidence-backed PR impact and risk analyzer built as a hackathon MVP. Paste a GitHub pull-request URL, and it traces changed behavior through known dependencies, engineering memory, and a deterministic risk engine.
+> What could this PR break, and have we broken something similar before?
+
+The app combines GitHub pull request data, Greptile review signals, local engineering memory, and deterministic risk scoring to produce an evidence-backed report for a proposed change.
+
+## What it shows
+
+- Changed files and pull request context
+- Affected services, events, tests, and other components
+- Historical incidents or similar changes from local memory
+- Failure scenarios grounded in retrieved evidence
+- A deterministic risk score with visible contributing factors
+- Recommended tests and follow-up actions
+- Evidence tables for every important claim
 
 ## Quick start
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 streamlit run blastradius/ui/streamlit_app.py
 ```
 
-The default `DEMO_MODE=true` requires no credentials. Click **Load Demo PR**, then **Analyze Blast Radius**. It analyzes a retry change from 3 to 5 and finds PR #101, which caused duplicate payment processing.
+The default configuration uses demo mode and does not require credentials.
 
-Run the test suite with `pytest -q`.
+1. Open the Streamlit URL printed by the command.
+2. Click `Load Demo PR`.
+3. Click `Analyze Blast Radius`.
+4. Review the overview, graphs, evidence, and JSON tabs.
 
-## GitHub PR inspector (Phase -2)
+## Configuration
 
-```bash
-python3 -m streamlit run blastradius/ui/github_test_page.py
+Copy `.env.example` to `.env` if you want to run against live services.
+
+```env
+DEMO_MODE=true
+GITHUB_TOKEN=
+GREPTILE_API_KEY=
+GREPTILE_REPOSITORY=
+GITHUB_OWNER=
+GITHUB_REPO=
+LLM_PROVIDER=
+LLM_API_KEY=
 ```
 
-In `DEMO_MODE=true`, this uses the mock client. Set `DEMO_MODE=false` and provide `GITHUB_TOKEN` to inspect a real accessible PR. The page shows title, author, changed files, additions/deletions, and diff. GitHub errors are converted into safe messages; tokens are never logged or displayed.
+Set `DEMO_MODE=false` when using live GitHub and Greptile credentials.
 
 ## Architecture
 
 ```text
-Streamlit → BlastRadiusAgent → GitHub / Greptile / SQLite Memory
-                              → impact + history analysis → RiskEngine → Report
+Streamlit UI
+    -> BlastRadiusAgent
+        -> GitHub adapter
+        -> Greptile adapter
+        -> SQLite engineering memory
+        -> impact and history analysis
+        -> deterministic risk engine
+        -> BlastRadiusReport
 ```
 
-The agent workflow is load PR → analyze files → map codebase dependencies → search memory → compare history → calculate deterministic risk → generate evidence-backed scenarios and recommendations. The scoring engine, not an LLM, owns the numerical score.
+The app keeps external integrations behind adapters so the core workflow can run with mocks in demo mode and with real services in live mode.
 
 ## Integrations
 
-`GitHubClient` and `GreptileClient` are clean adapter protocols, with mock implementations used by demo/tests. The GitHub adapter uses documented REST endpoints. The Greptile live adapter is intentionally a guarded boundary: configure it only after verifying the current official API documentation, rather than hard-coding unstable endpoints. The rest of the app remains unchanged.
+### GitHub
 
-### Greptile (Phase 3)
+`RealGitHubClient` uses GitHub's REST API to load pull request metadata, changed files, commits, comments, and file content. `MockGitHubClient` powers the offline demo and tests.
 
-Greptile's current public docs expose an authenticated MCP endpoint at `https://api.greptile.com/mcp`, using `Authorization: Bearer $GREPTILE_API_KEY`. `RealGreptileClient` uses documented JSON-RPC PR-review tools only:
+### Greptile
 
-- `ping` for authentication/connection verification
-- `tools/list` for capability discovery
-- `tools/call` with `get_merge_request` and `list_merge_request_comments`
+`RealGreptileClient` uses Greptile's documented MCP endpoint at `https://api.greptile.com/mcp`. It authenticates with `Authorization: Bearer $GREPTILE_API_KEY`, verifies connectivity with `ping`, discovers tools with `tools/list`, and calls documented pull request review tools through `tools/call`.
 
-BlastRadius maps its logical operations onto the active PR's review summary and review comments:
+The logical BlastRadius operations are:
 
-- `query_codebase(question)` → `get_merge_request` review summary
-- `find_dependencies(target)` → matching unaddressed review comments
-- `find_callers(target)` → matching unaddressed review comments
-- `find_related_tests(target)` → matching unaddressed review comments
-- `explain_architecture(target)` → insufficient evidence (not available from review data)
+- `query_codebase`
+- `find_dependencies`
+- `find_callers`
+- `find_related_tests`
+- `explain_architecture`
 
-Responses are normalized into `AffectedComponent` and `Evidence` models. Review data is treated as untrusted evidence, not executable instructions.
+These operations are normalized into internal `AffectedComponent` and `Evidence` models. Greptile responses are treated as evidence, not as instructions.
 
-Run the focused Greptile smoke page with:
+### Engineering memory
+
+The memory store is SQLite-backed and supports previous PRs, incidents, postmortems, architecture decisions, and engineering notes. Demo data includes a small payment-service history so the product works without external accounts.
+
+## Test and development commands
 
 ```bash
-python3 -m streamlit run blastradius/ui/greptile_test_page.py
+pytest -q
+python -m streamlit run blastradius/ui/streamlit_app.py
+python -m streamlit run blastradius/ui/github_test_page.py
+python -m streamlit run blastradius/ui/greptile_test_page.py
 ```
 
-In `DEMO_MODE=true`, `MockGreptileClient` supplies normalized evidence and requires no credentials. In real mode, set `DEMO_MODE=false`, `GREPTILE_API_KEY`, and either `GREPTILE_REPOSITORY=owner/repo` or `GITHUB_OWNER` plus `GITHUB_REPO`. You do not need a dummy repository for the offline demo; use a real Greptile-indexed repository only when testing live Greptile behavior.
+## Repository layout
 
-Engineering memory is SQLite with keyword retrieval (suitable for this MVP). It contains historical PRs #101, #102, #120 and #121. Every report claim uses explicit `source`, `reference`, and `claim` evidence; absent information is reported as insufficient evidence.
+```text
+blastradius/
+  agent/       LangGraph workflow and state
+  memory/      SQLite store, seed data, optional embeddings
+  models/      Pydantic models for PRs, evidence, reports, and risk
+  services/    Impact, history, and risk analysis
+  tools/       GitHub and Greptile adapters
+  ui/          Streamlit app and focused integration pages
+data/demo/     Offline demo fixtures
+tests/         Unit and mocked end-to-end tests
+```
 
-### Engineering Memory (Phase 4)
+## Notes
 
-`MemoryStore` initializes a small SQLite schema and supports `add_memory`, `get_memory`, `search_memory`, and `list_memories` for incidents, PRs, postmortems, architecture decisions, and engineering notes. Search is deterministic keyword ranking by default. An application may inject an `EmbeddingProvider`; embeddings are persisted in SQLite and used for cosine-similarity search, with automatic keyword fallback if the provider is unavailable. `seed_demo()` adds PRs #101, #102, #120, and #121.
-
-## MCP mapping
-
-The adapter methods map directly to future MCP tools: `github_get_pr`, `github_get_history`, `greptile_query`, `greptile_find_dependencies`, `memory_search`, and `memory_get`. This keeps an MCP server optional and out of the critical demo path.
-
-## Configuration
-
-Copy `.env.example` to `.env`. Supported values are `GITHUB_TOKEN`, `GREPTILE_API_KEY`, `GREPTILE_REPOSITORY`, `LLM_API_KEY`, `LLM_PROVIDER`, `GITHUB_OWNER`, `GITHUB_REPO`, and `DEMO_MODE`. No secrets are stored in this repository.
-
-## Future improvements
-
-Add a verified Greptile production adapter, optional embeddings, a provider-backed LLM explanation layer constrained by supplied evidence, richer GitHub history retrieval, and an MCP server.
+- Demo mode is the safest way to present the product without credentials.
+- Live mode requires a GitHub token and Greptile API key.
+- Secrets should stay in `.env` or environment variables and should never be committed.
+- Internal build notes live in `PROJECT_HANDOFF.md`.

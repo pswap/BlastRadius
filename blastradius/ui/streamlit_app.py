@@ -154,7 +154,7 @@ def render_summary(report):
         st.subheader("Executive summary", anchor=False)
         color, icon = RISK_BADGE.get(report.risk_level.value, ("gray", ":material/info:"))
         st.badge(
-            f"{report.risk_level.value} RISK · {report.risk_score}/100",
+            f"{report.risk_level.value} RISK - {report.risk_score}/100",
             color=color,
             icon=icon,
         )
@@ -240,7 +240,7 @@ def render_pr_context(report):
         st.subheader("Pull request", anchor=False)
         st.markdown(f"**{pr.title}**")
         st.caption(
-            f":material/tag: #{pr.number} · :material/person: {pr.author} · "
+            f":material/tag: #{pr.number} - :material/person: {pr.author} - "
             f":material/database: {pr.owner}/{pr.repo}"
         )
         if pr.labels:
@@ -248,7 +248,7 @@ def render_pr_context(report):
         for changed in pr.changed_files:
             st.markdown(
                 f"`{changed.path}` &nbsp; :green[+{changed.additions}] "
-                f":red[−{changed.deletions}] &nbsp; :gray[{changed.status}]"
+                f":red[-{changed.deletions}] &nbsp; :gray[{changed.status}]"
             )
             if changed.patch:
                 st.code(changed.patch, language="diff")
@@ -263,7 +263,7 @@ def render_failure_scenarios(report):
             for key, label, icon in SCENARIO_STAGES:
                 text = scenario.get(key)
                 if text:
-                    st.markdown(f"{icon} **{label}** — {text}")
+                    st.markdown(f"{icon} **{label}** - {text}")
             evidence = scenario.get("evidence", [])
             if evidence:
                 with st.expander(
@@ -271,7 +271,7 @@ def render_failure_scenarios(report):
                 ):
                     for item in evidence:
                         st.markdown(
-                            f":gray-badge[{item['source']}] `{item['reference']}` — {item['claim']}"
+                            f":gray-badge[{item['source']}] `{item['reference']}` - {item['claim']}"
                         )
 
 
@@ -299,7 +299,7 @@ def render_recommendations(report):
 def render_evidence(report):
     with st.container(border=True):
         st.subheader("Reasoning chain", anchor=False)
-        st.write(" → ".join(report.reasoning_chain))
+        st.write(" -> ".join(report.reasoning_chain))
 
     left, right = st.columns(2, gap="large")
     with left:
@@ -400,7 +400,7 @@ def inject_greptile_styles():
 
 
 def main():
-    st.set_page_config(page_title="BlastRadius", page_icon="🔥", layout="wide")
+    st.set_page_config(page_title="BlastRadius", layout="wide")
     inject_greptile_styles()
     st.title("BlastRadius", anchor=False)
     st.caption("Git shows what changed. BlastRadius shows what could break.")
@@ -426,7 +426,7 @@ def main():
 
     if run:
         progress = []
-        with st.status("Analyzing blast radius…", expanded=True) as status:
+        with st.status("Analyzing blast radius...", expanded=True) as status:
             steps = st.empty()
 
             def update(label):

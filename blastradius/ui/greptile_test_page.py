@@ -1,4 +1,4 @@
-"""Focused Phase 3 screen for inspecting Greptile normalized responses."""
+"""Focused screen for inspecting Greptile normalized responses."""
 from pathlib import Path
 import sys
 
@@ -33,9 +33,9 @@ def render_components(components):
 
 
 def main():
-    st.set_page_config(page_title="BlastRadius · Greptile test", page_icon="G", layout="wide")
-    st.title("Greptile Codebase Inspector")
-    st.caption("Phase 3 integration test page. API keys are read from the environment and never displayed.")
+    st.set_page_config(page_title="BlastRadius Greptile test", layout="wide")
+    st.title("Greptile codebase inspector")
+    st.caption("Focused integration test page. API keys are read from the environment and never displayed.")
 
     repository = st.text_input("Greptile repository", value=settings.greptile_repository or "owner/repo")
     question = st.text_input("Codebase question", value="What depends on PaymentService?")

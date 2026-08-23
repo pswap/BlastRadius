@@ -1,4 +1,4 @@
-"""Focused Phase 2 screen for inspecting a GitHub pull request."""
+"""Focused screen for inspecting a GitHub pull request."""
 from pathlib import Path
 import sys
 
@@ -22,9 +22,9 @@ def render_pr(pr):
 
 
 def main():
-    st.set_page_config(page_title="BlastRadius · GitHub test", page_icon="🐙", layout="wide")
-    st.title("🐙 GitHub PR Inspector")
-    st.caption("Phase 2 integration test page. Tokens are never displayed or logged.")
+    st.set_page_config(page_title="BlastRadius GitHub test", layout="wide")
+    st.title("GitHub PR inspector")
+    st.caption("Focused integration test page. Tokens are never displayed or logged.")
     url = st.text_input("GitHub PR URL", value=demo_pr().url)
     if st.button("Load pull request", type="primary"):
         try:

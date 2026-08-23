@@ -1,4 +1,4 @@
-# BlastRadius theme — a serious security-tooling look with an ember "blast" accent.
+# BlastRadius theme - a serious security-tooling look with an ember accent.
 # Both light and dark modes are defined so users can toggle from the app menu.
 
 [theme]
@@ -18,7 +18,7 @@ showWidgetBorder = true
 showSidebarBorder = true
 
 [theme.light]
-primaryColor = "#C2410C"             # burnt ember — white button text stays readable
+primaryColor = "#C2410C"             # burnt ember; white button text stays readable
 backgroundColor = "#FFFFFF"
 secondaryBackgroundColor = "#F5F5F4"
 codeBackgroundColor = "#F5F5F4"
